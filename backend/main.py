@@ -1,12 +1,12 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
-from sqladmin import Admin, ModelView, action
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.quotes.api.schemas import HealthCheckResponse
-from src.quotes.api.routes import router as quotes_router
-from src.quotes.core.database import create_tables, engine
-from src.quotes.models.database import Quote
+from src.quotes.api.quote_routes import router as quotes_router
+from src.quotes.api.user_routes import router as users_router
+from src.quotes.core.database import create_tables
+from src.quotes.admin.admin import setup_admin
 
 
 @asynccontextmanager
@@ -22,27 +22,21 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Include the quotes router
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include the routers
 app.include_router(quotes_router)
+app.include_router(users_router)
 
-# Configure SQLAdmin
-admin = Admin(app, engine)
-
-# Register models with SQLAdmin
-class QuoteAdmin(ModelView, model=Quote):
-    column_list = [Quote.id, Quote.text, Quote.author, Quote.category, Quote.created_at]
-    column_searchable_list = [Quote.text, Quote.author, Quote.category]
-    column_sortable_list = [Quote.id, Quote.author, Quote.category, Quote.created_at]
-    form_columns = [Quote.text, Quote.author, Quote.category]
-    
-    @action(name="print_selected", label="Print Selected Quotes")
-    async def print_selected_quotes(self, request: Request) :
-        print("Print selected quotes action executed!")
-        
-        # Redirect back to the admin page after action
-        return RedirectResponse(url="/admin/quote/list", status_code=302)
-
-admin.add_view(QuoteAdmin)
+# Setup SQLAdmin
+setup_admin(app)
 
 
 @app.get("/", response_model=dict)

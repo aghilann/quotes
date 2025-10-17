@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from src.quotes.models.database import Quote as QuoteModel
+from src.quotes.models.database import Quote as QuoteModel, User as UserModel
 from src.quotes.api.schemas import Quote, QuoteCreate, QuoteUpdate
 
 
@@ -18,10 +18,15 @@ class QuoteService:
     
     def create_quote(self, quote_data: QuoteCreate) -> Quote:
         """Create a new quote"""
+        # Verify user exists
+        user = self.db.query(UserModel).filter(UserModel.id == quote_data.author).first()
+        if not user:
+            raise ValueError(f"User with id {quote_data.author} not found")
+        
         db_quote = QuoteModel(
             text=quote_data.text,
-            author=quote_data.author,
-            category=quote_data.category
+            category=quote_data.category,
+            author=quote_data.author
         )
         
         self.db.add(db_quote)
@@ -35,7 +40,7 @@ class QuoteService:
         page: int = 1, 
         per_page: int = 10, 
         category: Optional[str] = None, 
-        author: Optional[str] = None
+        author: Optional[int] = None
     ) -> tuple[List[Quote], int]:
         """Get quotes with pagination and filtering"""
         
@@ -51,9 +56,9 @@ class QuoteService:
         # Get total count
         total = query.count()
         
-        # Apply pagination
+        # Apply sorting (latest first) and pagination
         offset = (page - 1) * per_page
-        db_quotes = query.offset(offset).limit(per_page).all()
+        db_quotes = query.order_by(QuoteModel.created_at.desc()).offset(offset).limit(per_page).all()
         
         # Convert to Pydantic models
         quotes = [self._convert_to_pydantic(q) for q in db_quotes]
@@ -79,10 +84,14 @@ class QuoteService:
         # Update fields if provided
         if quote_update.text is not None:
             db_quote.text = quote_update.text
-        if quote_update.author is not None:
-            db_quote.author = quote_update.author
         if quote_update.category is not None:
             db_quote.category = quote_update.category
+        if quote_update.author is not None:
+            # Verify user exists
+            user = self.db.query(UserModel).filter(UserModel.id == quote_update.author).first()
+            if not user:
+                raise ValueError(f"User with id {quote_update.author} not found")
+            db_quote.author = quote_update.author
         
         # Commit changes
         self.db.commit()
@@ -111,8 +120,8 @@ class QuoteService:
         return Quote(
             id=db_quote.id,
             text=db_quote.text,
-            author=db_quote.author,
             category=db_quote.category,
+            author=db_quote.author,
             created_at=db_quote.created_at,
             updated_at=db_quote.updated_at
         )

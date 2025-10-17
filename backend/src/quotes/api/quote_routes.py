@@ -27,7 +27,7 @@ async def get_quotes(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(10, ge=1, le=100, description="Items per page"),
     category: Optional[str] = Query(None, description="Filter by category"),
-    author: Optional[str] = Query(None, description="Filter by author"),
+    author: Optional[int] = Query(None, description="Filter by author ID"),
     db: Session = Depends(get_db)
 ):
     """Get all quotes with pagination and filtering"""

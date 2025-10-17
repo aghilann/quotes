@@ -23,10 +23,6 @@ Base = declarative_base()
 
 
 def get_db():
-    """
-    Dependency to get database session.
-    Use this in FastAPI route dependencies.
-    """
     db = SessionLocal()
     try:
         yield db
